@@ -119,7 +119,7 @@ if (events.length === 0 || events.length !== 0) {
 function saveStorage(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
   localStorage.setItem(CAT_KEY, JSON.stringify(categories));
-  fetch('https://<あなたのデプロイURL>/api/events', {
+  fetch('https://calendar-discord-notifier.onrender.com//api/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ events })
