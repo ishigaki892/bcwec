@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BCWEC web</title>
+<link rel="icon" href="./img/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="./bcwec.css">
+</head>
+<body>
+<div class="container">
+  <div class="sidebar">
+    <h3 id="sidebarTitle">予定を選択してください</h3>
+    <div id="eventList" class="event-list">
+      </div>
+  </div>
+
+  <div class="calendar-view">
+    <div class="header">
+      <div class="h-left">
+        <h2 style="margin:0">BCWEC</h2>
+        <div class="small">Battle Cats Weekly Event calendar for web</div>
+      </div>
+      <div class="controls">
+        <button id="prev">◀</button>
+        <button id="today" class="btn-ghost">今日</button>
+        <button id="next">▶</button>
+        <button id="export" class="btn-ghost">エクスポート</button>
+        <button id="import" class="btn-ghost">インポート</button>
+      </div>
+    </div>
+    <div class="card">
+      <div id="calendar" class="calendar">
+        <div class="month" id="month0"></div>
+        <div class="month" id="month1"></div>
+      </div>
+      <div style="margin-top:10px" class="small">にゃんこ大戦争定期開催イベントカレンダー</div>
+      <a href="index.html">戻る</a>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="modal" aria-hidden>
+  <div class="form" role="dialog" aria-modal="true">
+    <h3 id="modalTitle">予定を追加</h3>
+    <label>タイトル<input id="title" type="text" placeholder="会議・買い物など"></label>
+    <div class="row">
+      <div style="flex:1"><label>日付<input id="date" type="date"></label></div>
+      <div style="width:140px"><label>開始時間<input id="time" type="time"></label></div>
+      <div style="width:140px"><label>終了時間<input id="endTime" type="time"></label></div>
+    </div>
+    <label>説明<textarea id="desc" rows="3"></textarea></label>
+
+    <label>カテゴリ
+      <div class="row">
+        <select id="categorySelect"></select>
+        <input id="newCategoryName" type="text" placeholder="新しいカテゴリ名（任意）" />
+        <input id="newCategoryColor" type="color" value="#2b8cf3" style="width:56px" />
+        <button id="addCategory" class="btn-ghost">追加</button>
+      </div>
+    </label>
+
+    <label>繰り返し
+      <select id="recur">
+        <option value="none">なし（1回のみ）</option>
+        <option value="daily">毎日</option>
+        <option value="weekly">毎週</option>
+        <option value="biweekly">隔週</option>
+        <option value="every_n_weeks">n週おき</option>
+        <option value="monthly_specific_days">毎月 複数日</option>
+        <option value="monthly_nth">毎月 週&曜日</option>
+      </select>
+    </label>
+
+    <div id="recurOptions" class="small" style="margin-top:6px"></div>
+
+    <label class="small">終了日（任意）<input id="until" type="date"></label>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button id="save">保存</button>
+      <button id="delete" class="btn-ghost">削除</button>
+      <button id="cancel" class="btn-ghost">キャンセル</button>
+    </div>
+  </div>
+</div>
+<div id="context" style="display:none;" class="context"></div>
+
+<input id="fileInput" type="file" accept="application/json" style="display:none">
+
+<script type="module" src="./bcwec.js"></script>
+</body>
+</html>
