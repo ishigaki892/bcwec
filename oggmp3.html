@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OGG ↔ MP3 変換ツール (ブラウザだけで完結)</title>
+<meta name="description" content="ブラウザだけで OGG と MP3 を相互変換。ffmpeg.wasm を使用。インストール不要。" />
+<style>
+:root{ --bg:#0b1020; --panel:#131833; --muted:#9aa3b2; --text:#e9edf3; --accent:#6cb4ff; --accent2:#9d7dff; } *{box-sizing:border-box} html,body{height:100%} body{margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif; color:var(--text); background:linear-gradient(180deg, #0b1020, #0e1430 45%, #0b1020 100%) fixed;} header{ padding:28px 16px 8px; text-align:center; } header h1{margin:0; font-size: clamp(22px, 4vw, 32px); letter-spacing:.02em} header p{margin:6px 0 0; color:var(--muted); font-size: 14px} .container{max-width:980px; margin:16px auto 40px; padding:0 14px} .panel{background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:16px; box-shadow: 0 8px 30px rgba(0,0,0,.25);} .controls{display:grid; gap:12px; grid-template-columns: 1fr; padding:16px} @media (min-width: 700px){ .controls{grid-template-columns: 1.2fr .8fr .8fr .8fr; align-items:end} } label{font-size:12px; color:var(--muted); display:block; margin-bottom:6px} input[type="file"]{width:100%;} select, button, input[type="file"]{ background:var(--panel); color:var(--text); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 12px; outline:none; } button{cursor:pointer} .primary{background:linear-gradient(120deg, var(--accent), var(--accent2)); border: none; color:#0b0e1e; font-weight:700} .secondary{background: rgba(255,255,255,0.06)} .dropzone{ margin:16px; border: 1.8px dashed rgba(255,255,255,.2); border-radius:14px; padding:22px; text-align:center; color:var(--muted); transition: .2s; background: rgba(20,25,55,.25) } .dropzone.dragover{border-color: var(--accent); color: var(--text); background: rgba(108,180,255,.08)} .hint{font-size:12px; color:var(--muted)} .progress-wrap{padding:0 16px 16px} progress{width:100%; height:16px; -webkit-appearance: none; appearance: none} progress::-webkit-progress-bar{background:#1a2148; border-radius:10px} progress::-webkit-progress-value{background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius:10px} .progress-text{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:8px} .results{padding:8px 12px 18px; display:grid; gap:10px} .file-card{display:flex; gap:12px; align-items:center; justify-content:space-between; background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:12px} .file-info{display:flex; gap:12px; align-items:center} .badge{font-size:11px; color:#0b0e1e; background:linear-gradient(120deg, var(--accent), var(--accent2)); padding:3px 8px; border-radius:999px; font-weight:700} .small{font-size:12px; color:var(--muted)} footer{opacity:.7; text-align:center; font-size:12px; padding:16px} a.download{background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); padding:8px 10px; border-radius:10px; text-decoration:none; color:var(--text)} .hidden{display:none}
+</style>
+</head>
+<body>
+  <header>
+    <h1>OGG ↔ MP3 変換ツール</h1>
+    <p>インストール不要。ブラウザだけで安全に変換（ffmpeg.wasm 使用）。複数ファイルOK。</p>
+  </header>
+  <div class="container">
+    <section class="panel">
+      <div class="controls">
+        <div>
+          <label>音声ファイルを選択（MP3 / OGG）</label>
+          <input id="file-input" type="file" accept="audio/mpeg, audio/mp3, audio/ogg" multiple />
+        </div>
+        <div>
+          <label>出力形式</label>
+          <select id="format">
+            <option value="mp3">MP3</option>
+            <option value="ogg">OGG</option>
+          </select>
+        </div>
+        <div>
+          <label>ビットレート</label>
+          <select id="bitrate">
+            <option>96k</option>
+            <option>128k</option>
+            <option selected>192k</option>
+            <option>256k</option>
+            <option>320k</option>
+          </select>
+        </div>
+        <div>
+          <button id="convert" class="primary">変換を開始</button>
+        </div>
+      </div>
+
+      <div class="dropzone" id="dropzone">
+        ここにファイルをドラッグ＆ドロップしてもOK
+      </div>
+
+      <div class="progress-wrap hidden" id="progress-wrap">
+        <progress id="progress" value="0" max="100"></progress>
+        <div class="progress-text"><span id="progress-label">準備中…</span><span id="progress-num">0%</span></div>
+      </div>
+
+      <div class="results" id="results"></div>
+    </section>
+
+    <p class="hint">💡 ブラウザ内でのみ処理します。ファイルはサーバーへアップロードされません。大きなファイルの処理には多少時間がかかります。</p>
+  </div>
+  <footer>
+    <span>Powered by ffmpeg.wasm</span>
+  </footer>
+
+  <!-- ESM modules of @ffmpeg -->
+  <script type="module">
+    import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js';
+    import { fetchFile, toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
+
+
+    const fileInput = document.getElementById('file-input');
+    const dz = document.getElementById('dropzone');
+    const btn = document.getElementById('convert');
+    const formatSel = document.getElementById('format');
+    const bitrateSel = document.getElementById('bitrate');
+    const resultsEl = document.getElementById('results');
+    const progressWrap = document.getElementById('progress-wrap');
+    const progressBar = document.getElementById('progress');
+    const progressNum = document.getElementById('progress-num');
+    const progressLabel = document.getElementById('progress-label');
+
+
+    // ---- ffmpeg instance (use core-mt with worker) ----
+    const ffmpeg = new FFmpeg();
+    let ffmpegReady = false;
+
+
+    async function ensureFFmpeg() {
+    if (ffmpegReady) return;
+    const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm';
+    progressWrap.classList.remove('hidden');
+    progressLabel.textContent = 'FFmpeg を読み込み中…';
+    progressBar.value = 2; progressNum.textContent = '2%';
+    await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript')
+    });
+    ffmpegReady = true;
+    progressBar.value = 4; progressNum.textContent = '4%';
+    }
+
+    // UI helpers
+    function setProgress(p, label) {
+      progressWrap.classList.remove('hidden');
+      progressBar.value = Math.min(100, Math.max(0, p));
+      progressNum.textContent = `${Math.round(progressBar.value)}%`;
+      if (label) progressLabel.textContent = label;
+    }
+    function resetProgress(){
+      progressBar.value = 0; progressNum.textContent = '0%'; progressLabel.textContent = '準備中…';
+    }
+
+    // Drag & Drop
+    dz.addEventListener('dragover', (e)=>{ e.preventDefault(); dz.classList.add('dragover'); });
+    dz.addEventListener('dragleave', ()=> dz.classList.remove('dragover'));
+    dz.addEventListener('drop', (e)=>{
+      e.preventDefault(); dz.classList.remove('dragover');
+      const files = Array.from(e.dataTransfer.files || []).filter(f=>/\.(mp3|ogg)$/i.test(f.name));
+      if (!files.length) return;
+      addFiles(files);
+    });
+
+    function addFiles(files){
+      const dt = new DataTransfer();
+      Array.from(fileInput.files || []).forEach(f=>dt.items.add(f));
+      files.forEach(f=>dt.items.add(f));
+      fileInput.files = dt.files;
+    }
+
+    // Auto toggle output based on first selected file (optional)
+    fileInput.addEventListener('change', ()=>{
+      const f = fileInput.files?.[0];
+      if(!f) return;
+      if(/\.mp3$/i.test(f.name)) formatSel.value = 'ogg';
+      if(/\.ogg$/i.test(f.name)) formatSel.value = 'mp3';
+    });
+
+    // Core conversion logic (with codec fallback)
+    async function transcodeOne(file, outFmt, bitrate){
+      const inName = `in_${crypto.randomUUID()}${file.name.toLowerCase().endsWith('.ogg')?'.ogg':'.mp3'}`;
+      const outName = `out_${crypto.randomUUID()}.${outFmt}`;
+      await ffmpeg.writeFile(inName, await fetchFile(file));
+
+      const argsCommon = ['-i', inName, '-vn', '-b:a', bitrate, '-ac', '2'];
+
+      // prefer high quality encoders, then fallback to native if unavailable
+      const plans = outFmt === 'mp3'
+        ? [ ['-c:a','libmp3lame'], ['-c:a','mp3'] ]
+        : [ ['-c:a','libvorbis'], ['-c:a','vorbis'] ];
+
+      let success = false, lastError = null;
+      for (const plan of plans){
+        try {
+          await ffmpeg.exec([...argsCommon, ...plan, outName]);
+          success = true; break;
+        } catch (err){
+          lastError = err;
+        }
+      }
+      if (!success) throw lastError || new Error('エンコードに失敗しました');
+
+      const data = await ffmpeg.readFile(outName);
+      await ffmpeg.deleteFile(inName).catch(()=>{});
+      await ffmpeg.deleteFile(outName).catch(()=>{});
+      return new Blob([data.buffer], { type: outFmt === 'mp3' ? 'audio/mpeg' : 'audio/ogg' });
+    }
+
+    // Bind ffmpeg progress -> UI
+    ffmpeg.on('progress', ({progress, time}) => {
+      const p = Math.min(98, Math.round((progress || 0) * 100));
+      setProgress(p, `変換中… ${time?`(t=${Math.round(time/1000000)}s)`:''}`);
+    });
+
+    btn.addEventListener('click', async ()=>{
+      const files = Array.from(fileInput.files || []);
+      if (!files.length) {
+        alert('先にファイルを選択してください。');
+        return;
+      }
+      btn.disabled = true; btn.textContent = '変換中…';
+      resultsEl.innerHTML = '';
+      resetProgress();
+
+      try {
+        await ensureFFmpeg();
+        const outFmt = formatSel.value;
+        const bitrate = bitrateSel.value;
+
+        for (let i=0;i<files.length;i++){
+          const f = files[i];
+          setProgress(6 + Math.round((i/files.length)*10), `準備中… (${i+1}/${files.length})`);
+          // if the same type, we still re-encode to desired bitrate
+          const blob = await transcodeOne(f, outFmt, bitrate);
+          const url = URL.createObjectURL(blob);
+          const orig = f.name.replace(/\.(mp3|ogg)$/i, '');
+          const outName = `${orig}.${outFmt}`;
+
+          const card = document.createElement('div');
+          card.className = 'file-card';
+          card.innerHTML = `
+            <div class="file-info">
+              <span class="badge">DONE</span>
+              <div>
+                <div>${escapeHtml(outName)}</div>
+                <div class="small">${formatBytes(f.size)} → 約 ${formatBytes(blob.size)}</div>
+              </div>
+            </div>
+            <div>
+              <audio controls src="${url}" preload="metadata" style="height:28px; vertical-align:middle"></audio>
+              <a class="download" download="${escapeAttr(outName)}" href="${url}">ダウンロード</a>
+            </div>`;
+          resultsEl.appendChild(card);
+        }
+        setProgress(100, '完了');
+      } catch (err){
+        console.error(err);
+        alert('変換中にエラーが発生しました\n' + (err?.message || err));
+      } finally {
+        btn.disabled = false; btn.textContent = '変換を開始';
+      }
+    });
+
+    function formatBytes(b){
+      if(!b && b!==0) return '-';
+      const u=['B','KB','MB','GB']; let i=0; while(b>=1024 && i<u.length-1){ b/=1024; i++; }
+      return `${b.toFixed( (i?1:0) )} ${u[i]}`;
+    }
+    function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function escapeAttr(s){ return s.replace(/[\n\r\t\f\v]/g,' '); }
+  </script>
+</body>
+</html>
